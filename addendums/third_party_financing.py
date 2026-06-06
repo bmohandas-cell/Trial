@@ -39,40 +39,40 @@ def collect_data() -> dict:
     return data
 
 
-def fill(page: Page, data: dict) -> None:
+def fill(page: Page, data: dict, **_) -> None:
     """Fill the Third Party Financing Addendum already open in the page."""
     print("[*] Filling Third Party Financing Addendum...")
 
-    from zipform_bot import _fill, _select, _click
+    from zipform_bot import _fill_field, _select, DEBUG_MODE
 
     financing = data.get("financing_type", "")
     if financing:
-        # Click the matching financing type checkbox / radio
         try:
             page.click(f'label:has-text("{financing}"), input[value*="{financing}" i]', timeout=4000)
         except PWTimeout:
-            pass
+            if DEBUG_MODE:
+                from zipform_bot import _debug_pause
+                _debug_pause(page, "tpf_financing_type", financing)
 
-    pairs = [
-        ("loan_amount",         ['input[name*="loanAmount" i]',         '#loanAmount']),
-        ("loan_years",          ['input[name*="loanYears" i]',          '#loanYears']),
-        ("interest_rate",       ['input[name*="interestRate" i]',       '#interestRate']),
-        ("origination_charges", ['input[name*="originationCharge" i]',  '#originationCharges']),
-        ("discount_points",     ['input[name*="discountPoints" i]',     '#discountPoints']),
-        ("mip",                 ['input[name*="mip" i]',                '#mip']),
-        ("va_funding_fee",      ['input[name*="vaFundingFee" i]',       '#vaFundingFee']),
-        ("approval_days",       ['input[name*="approvalDays" i]',       '#approvalDays', 'input[placeholder*="approval" i]']),
+    fields = [
+        ("tpf_loan_amount",         ['input[name*="loanAmount" i]',         '#loanAmount']),
+        ("tpf_loan_years",          ['input[name*="loanYears" i]',          '#loanYears']),
+        ("tpf_interest_rate",       ['input[name*="interestRate" i]',       '#interestRate']),
+        ("tpf_origination_charges", ['input[name*="originationCharge" i]',  '#originationCharges']),
+        ("tpf_discount_points",     ['input[name*="discountPoints" i]',     '#discountPoints']),
+        ("tpf_mip",                 ['input[name*="mip" i]',                '#mip']),
+        ("tpf_va_funding_fee",      ['input[name*="vaFundingFee" i]',       '#vaFundingFee']),
+        ("tpf_approval_days",       ['input[name*="approvalDays" i]',       '#approvalDays', 'input[placeholder*="approval" i]']),
     ]
 
-    for key, selectors in pairs:
-        value = data.get(key, "")
-        if not value:
-            continue
-        for sel in selectors:
-            try:
-                _fill(page, sel, value, timeout=3000)
-                break
-            except PWTimeout:
-                continue
+    # Map addendum keys back to data keys (strip tpf_ prefix)
+    key_map = {f"tpf_{k}": k for k in [
+        "loan_amount", "loan_years", "interest_rate", "origination_charges",
+        "discount_points", "mip", "va_funding_fee", "approval_days",
+    ]}
+
+    for cache_key, selectors in fields:
+        data_key = key_map[cache_key]
+        _fill_field(page, cache_key, selectors, data.get(data_key, ""))
 
     print("[+] Third Party Financing Addendum filled.")

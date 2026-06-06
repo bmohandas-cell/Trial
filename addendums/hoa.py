@@ -52,65 +52,57 @@ def collect_data() -> dict:
     return data
 
 
-def fill(page: Page, data: dict) -> None:
+def fill(page: Page, data: dict, **_) -> None:
     """Fill the HOA Addendum already open in the page."""
     print("[*] Filling HOA Addendum...")
 
-    from zipform_bot import _fill, _click
+    from zipform_bot import _fill_field, DEBUG_MODE
 
-    pairs = [
+    fields = [
         ("hoa_name",            ['input[name*="hoaName" i]',          '#hoaName',          'input[placeholder*="Association Name" i]']),
-        ("management_company",  ['input[name*="managementCo" i]',     '#managementCompany','input[placeholder*="Management" i]']),
-        ("management_phone",    ['input[name*="managementPhone" i]',  '#managementPhone']),
-        ("transfer_fee",        ['input[name*="transferFee" i]',      '#transferFee',      'input[placeholder*="Transfer Fee" i]']),
-        ("other_fees",          ['input[name*="otherFees" i]',        'textarea[name*="otherFees" i]']),
-        ("dues_amount",         ['input[name*="duesAmount" i]',       '#duesAmount',       'input[placeholder*="Dues" i]']),
-        ("resale_cert_days",    ['input[name*="resaleCertDays" i]',   '#resaleCertDays']),
+        ("hoa_management_co",   ['input[name*="managementCo" i]',     '#managementCompany','input[placeholder*="Management" i]']),
+        ("hoa_mgmt_phone",      ['input[name*="managementPhone" i]',  '#managementPhone']),
+        ("hoa_transfer_fee",    ['input[name*="transferFee" i]',      '#transferFee',      'input[placeholder*="Transfer Fee" i]']),
+        ("hoa_other_fees",      ['input[name*="otherFees" i]',        'textarea[name*="otherFees" i]']),
+        ("hoa_dues_amount",     ['input[name*="duesAmount" i]',       '#duesAmount',       'input[placeholder*="Dues" i]']),
+        ("hoa_resale_cert_days",['input[name*="resaleCertDays" i]',   '#resaleCertDays']),
         ("hoa_approval_days",   ['input[name*="hoaApprovalDays" i]',  '#hoaApprovalDays']),
-        ("special_provisions",  ['textarea[name*="specialProv" i]',   '#specialProvisions']),
+        ("hoa_special_prov",    ['textarea[name*="specialProv" i]',   '#specialProvisions']),
     ]
 
-    for key, selectors in pairs:
-        value = data.get(key, "")
+    key_map = {
+        "hoa_name": "hoa_name",
+        "hoa_management_co": "management_company",
+        "hoa_mgmt_phone": "management_phone",
+        "hoa_transfer_fee": "transfer_fee",
+        "hoa_other_fees": "other_fees",
+        "hoa_dues_amount": "dues_amount",
+        "hoa_resale_cert_days": "resale_cert_days",
+        "hoa_approval_days": "hoa_approval_days",
+        "hoa_special_prov": "special_provisions",
+    }
+
+    for cache_key, selectors in fields:
+        data_key = key_map[cache_key]
+        _fill_field(page, cache_key, selectors, data.get(data_key, ""))
+
+    # Radios — try click, fall back to debug
+    radio_fields = [
+        ("dues_frequency",  f'label:has-text("{data.get("dues_frequency","")}")'),
+        ("resale_cert",     f'label:has-text("{data.get("resale_cert","")}")'),
+        ("subdivision_info",f'label:has-text("{data.get("subdivision_info","")}")'),
+        ("hoa_approval",    f'label:has-text("{data.get("hoa_approval","")}")'),
+    ]
+
+    for field_key, sel in radio_fields:
+        value = data.get(field_key, "")
         if not value:
             continue
-        for sel in selectors:
-            try:
-                _fill(page, sel, value, timeout=3000)
-                break
-            except PWTimeout:
-                continue
-
-    # Dues frequency radio/select
-    freq = data.get("dues_frequency", "")
-    if freq:
         try:
-            page.click(f'label:has-text("{freq}")', timeout=3000)
+            page.click(sel, timeout=3000)
         except PWTimeout:
-            pass
-
-    # Resale cert — who orders radio
-    cert = data.get("resale_cert", "")
-    if cert:
-        try:
-            page.click(f'label:has-text("{cert}") >> nth=0', timeout=3000)
-        except PWTimeout:
-            pass
-
-    # Subdivision info radio
-    sub_info = data.get("subdivision_info", "")
-    if sub_info:
-        try:
-            page.click(f'label:has-text("{sub_info}") >> nth=1', timeout=3000)
-        except PWTimeout:
-            pass
-
-    # HOA approval right
-    hoa_approval = data.get("hoa_approval", "")
-    if hoa_approval:
-        try:
-            page.click(f'label:has-text("{hoa_approval}") >> nth=2', timeout=3000)
-        except PWTimeout:
-            pass
+            if DEBUG_MODE:
+                from zipform_bot import _debug_pause
+                _debug_pause(page, f"hoa_{field_key}", value)
 
     print("[+] HOA Addendum filled.")
